@@ -38,14 +38,21 @@ type S3Options struct {
 
 // NewS3Client creates a new S3 client
 func NewS3Client(opts *S3Options) (S3Client, error) {
-	s3Session, err := session.NewSession(&aws.Config{
-		Credentials:      credentials.NewStaticCredentials(opts.AWSAccessKeyID, opts.AWSSecretAccessKey, ""),
+	awsConfig := &aws.Config{
 		Endpoint:         aws.String(opts.Endpoint),
 		Region:           aws.String(opts.Region),
 		DisableSSL:       aws.Bool(opts.DisableSSL),
 		S3ForcePathStyle: aws.Bool(opts.ForcePathStyle),
 		MaxRetries:       aws.Int(opts.MaxRetries),
-	})
+	}
+
+	// Only use static credentials if both are provided
+	// Otherwise, AWS SDK will use the default credential chain (IAM roles, env vars, etc.)
+	if opts.AWSAccessKeyID != "" && opts.AWSSecretAccessKey != "" {
+		awsConfig.Credentials = credentials.NewStaticCredentials(opts.AWSAccessKeyID, opts.AWSSecretAccessKey, "")
+	}
+
+	s3Session, err := session.NewSession(awsConfig)
 	if err != nil {
 		return nil, err
 	}

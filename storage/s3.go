@@ -109,7 +109,6 @@ func (s *s3Storage) Put(ctx context.Context, path string, contentType string, co
 		Body:        bytes.NewReader(contents),
 		Key:         aws.String(path),
 		ContentType: aws.String(contentType),
-		ACL:         aws.String(s3.BucketCannedACLPublicRead),
 	})
 	if err != nil {
 		return "", errors.Wrapf(err, "error putting S3 object")

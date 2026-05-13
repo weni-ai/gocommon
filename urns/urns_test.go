@@ -276,10 +276,16 @@ func TestValidate(t *testing.T) {
 		{"viber:asdf!12354", "invalid viber id"},
 		{"viber:xy5/5y6O81+/kbWHpLhBoA==", ""},
 
-		// whatsapp needs to be integers
+		// whatsapp needs to be integers or BSUIDs
 		{"whatsapp:12354", ""},
 		{"whatsapp:abcde", "invalid whatsapp id"},
 		{"whatsapp:+12067799294", "invalid whatsapp id"},
+		{"whatsapp:US.13491208655302741918", ""},
+		{"whatsapp:US.ENT.11815799212886844830", ""},
+		{"whatsapp:BR.98765432109876543210", ""},
+		{"whatsapp:US.", "invalid whatsapp id"},
+		{"whatsapp:us.123", "invalid whatsapp id"},
+		{"whatsapp:123.ABC", "invalid whatsapp id"},
 
 		// freschat has to be two uuids separated by a colon
 		{"freshchat:6a2f41a3-c54c-fce8-32d2-0324e1c32e22/6a2f41a3-c54c-fce8-32d2-0324e1c32e22", ""},
@@ -378,6 +384,12 @@ func TestWhatsAppURNs(t *testing.T) {
 	}{
 		{"12345", URN("whatsapp:12345"), false},
 		{"+12345", NilURN, true},
+		{"US.13491208655302741918", URN("whatsapp:US.13491208655302741918"), false},
+		{"US.ENT.11815799212886844830", URN("whatsapp:US.ENT.11815799212886844830"), false},
+		{"BR.98765432109876543210", URN("whatsapp:BR.98765432109876543210"), false},
+		{"US.", NilURN, true},
+		{"123.ABC", NilURN, true},
+		{"", NilURN, true},
 	}
 
 	for _, tc := range testCases {

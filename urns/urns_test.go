@@ -27,7 +27,7 @@ func TestURNProperties(t *testing.T) {
 		{"twitter:85114?foo=bar#foobar", "foobar", "foobar", "foo=bar", map[string][]string{"foo": {"bar"}}},
 		{"discord:732326982863421591", "732326982863421591", "", "", map[string][]string{}},
 		{"webchat:123456@foo", "123456@foo", "", "", map[string][]string{}},
-		{"teams:a:a1b2n4:serviceURL:https://test.example", "a:a1b2n4:serviceURL:https://test.example", "", "", map[string][]string{}},
+		{"teams:a1b2n4:test.example", "a1b2n4:test.example", "", "", map[string][]string{}},
 	}
 	for _, tc := range testCases {
 		assert.Equal(t, string(tc.urn), tc.urn.String())
@@ -63,10 +63,10 @@ func TestTeamsServiceURL(t *testing.T) {
 	testCases := []struct {
 		urn URN
 	}{
-		{"teams:a:a1b2n4:serviceURL:https://test.com"},
+		{"teams:a1b2n4:test.com"},
 	}
 	for _, tc := range testCases {
-		assert.Equal(t, "https://test.com", tc.urn.TeamsServiceURL())
+		assert.Equal(t, "test.com", tc.urn.TeamsServiceURL())
 	}
 }
 
@@ -88,7 +88,7 @@ func TestFromParts(t *testing.T) {
 		{"viber", "", "", NilURN, ":", true},
 		{"discord", "732326982863421591", "", URN("discord:732326982863421591"), URN("discord:732326982863421591"), false},
 		{"webchat", "12345@foo", "", URN("webchat:12345@foo"), URN("webchat:12345@foo"), false},
-		{"teams", "a:a1b2n4:serviceURL:https://test.example", "", URN("teams:a:a1b2n4:serviceURL:https://test.example"), URN("teams:a:a1b2n4:serviceURL:https://test.example"), false},
+		{"teams", "a1b2n4:test.example", "", URN("teams:a1b2n4:test.example"), URN("teams:a1b2n4:test.example"), false},
 	}
 
 	for _, tc := range testCases {
@@ -298,6 +298,14 @@ func TestValidate(t *testing.T) {
 		{"teams:a1b2n4:serviceURL:https://test.example", "invalid teams id"},
 		{"teams:a:a1b2n4:serviceURL:htt://test.example", "invalid teams id"},
 		{"teams:a:a1b2n4:https://test.example", "invalid teams id"},
+
+		// slack IDs
+		{"slack:U0123ABCDEF", ""},
+
+		// teams has the conversation id and after ':' comes the serviceURL
+		{"teams:a1b2n4:test.example", ""},
+		{"teams:123456", "invalid teams id"},
+		{"teams:a1b2n4:www.test.example", ""},
 	}
 
 	for _, tc := range testCases {
@@ -520,7 +528,7 @@ func TestTeamsURNs(t *testing.T) {
 		expected   URN
 		hasError   bool
 	}{
-		{"a:1a2b3c4d5e6f:serviceURL:https://test.example", URN("teams:a:1a2b3c4d5e6f:serviceURL:https://test.example"), false},
+		{"1a2b3c4d5e6f:test.example", URN("teams:1a2b3c4d5e6f:test.example"), false},
 		{"123456", URN("teams:123456"), true},
 	}
 

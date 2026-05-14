@@ -8,60 +8,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Queryer is the DB/TX functionality needed for operations in this package
-type Queryer interface {
+// BulkQueryer is the DB/TX functionality needed for these bulk operations
+type BulkQueryer interface {
 	Rebind(query string) string
-	QueryxContext(ctx context.Context, query string, args ...interface{}) (*sqlx.Rows, error)
-}
-
-// BulkQuery runs the query as a bulk operation with the given structs
-func BulkQuery(ctx context.Context, tx Queryer, query string, structs []interface{}) error {
-	// no structs, nothing to do
-	if len(structs) == 0 {
-		return nil
-	}
-
-	// rewrite query as a bulk operation
-	bulkQuery, args, err := BulkSQL(tx, query, structs)
-	if err != nil {
-		return err
-	}
-
-	rows, err := tx.QueryxContext(ctx, bulkQuery, args...)
-	if err != nil {
-		return NewQueryErrorf(err, bulkQuery, args, "error making bulk query")
-	}
-	defer rows.Close()
-
-	// if have a returning clause, read them back and try to map them
-	if strings.Contains(strings.ToUpper(query), "RETURNING") {
-		for _, s := range structs {
-			if !rows.Next() {
-				return errors.Errorf("did not receive expected number of rows on insert")
-			}
-
-			err = rows.StructScan(s)
-			if err != nil {
-				return errors.Wrap(err, "error scanning for returned values")
-			}
-		}
-	}
-
-	// iterate our remaining rows
-	for rows.Next() {
-	}
-
-	// check for any error
-	if rows.Err() != nil {
-		return NewQueryErrorf(rows.Err(), bulkQuery, args, "error during row iteration")
-	}
-
-	return nil
+	QueryxContext(ctx context.Context, query string, args ...any) (*sqlx.Rows, error)
 }
 
 // BulkSQL takes a query which uses VALUES with struct bindings and rewrites it as a bulk operation.
 // It returns the new SQL query and the args to pass to it.
-func BulkSQL(tx Queryer, sql string, structs []interface{}) (string, []interface{}, error) {
+func BulkSQL[T any](db BulkQueryer, sql string, structs []T) (string, []any, error) {
 	if len(structs) == 0 {
 		return "", nil, errors.New("can't generate bulk sql with zero structs")
 	}
@@ -71,7 +26,7 @@ func BulkSQL(tx Queryer, sql string, structs []interface{}) (string, []interface
 	values.Grow(7 * len(structs))
 
 	// this will be each of the arguments to match the positional values above
-	args := make([]interface{}, 0, len(structs)*5)
+	args := make([]any, 0, len(structs)*5)
 
 	// for each value we build a bound SQL statement, then extract the values clause
 	for i, value := range structs {
@@ -98,7 +53,51 @@ func BulkSQL(tx Queryer, sql string, structs []interface{}) (string, []interface
 		return "", nil, errors.Errorf("error extracting VALUES from sql: %s", sql)
 	}
 
-	return tx.Rebind(strings.Replace(sql, valuesSQL, values.String(), -1)), args, nil
+	return db.Rebind(strings.Replace(sql, valuesSQL, values.String(), -1)), args, nil
+}
+
+// BulkQuery runs the query as a bulk operation with the given structs
+func BulkQuery[T any](ctx context.Context, db BulkQueryer, query string, structs []T) error {
+	// no structs, nothing to do
+	if len(structs) == 0 {
+		return nil
+	}
+
+	// rewrite query as a bulk operation
+	bulkQuery, args, err := BulkSQL(db, query, structs)
+	if err != nil {
+		return err
+	}
+
+	rows, err := db.QueryxContext(ctx, bulkQuery, args...)
+	if err != nil {
+		return QueryErrorWrapf(err, bulkQuery, args, "error making bulk query")
+	}
+	defer rows.Close()
+
+	// if have a returning clause, read them back and try to map them
+	if strings.Contains(strings.ToUpper(query), "RETURNING") {
+		for i, s := range structs {
+			if !rows.Next() {
+				if rows.Err() != nil {
+					return QueryErrorWrapf(rows.Err(), bulkQuery, args, "missing returned row for struct %d", i)
+				}
+				return QueryErrorf(bulkQuery, args, "missing returned row for struct %d", i)
+			}
+
+			err = rows.StructScan(s)
+			if err != nil {
+				return QueryErrorWrapf(err, bulkQuery, args, "error scanning returned row %d", i)
+			}
+		}
+	}
+
+	// iterate our remaining rows
+	for rows.Next() {
+	}
+
+	// check for any error
+	return QueryErrorWrapf(rows.Err(), bulkQuery, args, "error during row iteration")
 }
 
 // extractValues is just a simple utility method that extracts the portion between `VALUE(`

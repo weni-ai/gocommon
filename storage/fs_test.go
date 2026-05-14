@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/nyaruka/gocommon/storage"
 	"github.com/nyaruka/gocommon/uuids"
 
@@ -18,7 +17,7 @@ func TestFS(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	s := storage.NewFS("_testing")
+	s := storage.NewFS("_testing", 0766)
 	assert.NoError(t, s.Test(ctx))
 
 	// break our ability to write to that directory
@@ -28,11 +27,11 @@ func TestFS(t *testing.T) {
 
 	require.NoError(t, os.Chmod("_testing", 0777))
 
-	url, err := s.Put(ctx, "/foo/bar.txt", "text/plain", []byte(`hello world`))
+	url, err := s.Put(ctx, "foo/bar.txt", "text/plain", []byte(`hello world`))
 	assert.NoError(t, err)
 	assert.Equal(t, "_testing/foo/bar.txt", url)
 
-	_, data, err := s.Get(ctx, "/foo/bar.txt")
+	_, data, err := s.Get(ctx, "foo/bar.txt")
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(`hello world`), data)
 
@@ -45,20 +44,18 @@ func TestFSBatchPut(t *testing.T) {
 	uuids.SetGenerator(uuids.NewSeededGenerator(12345))
 	defer uuids.SetGenerator(uuids.DefaultGenerator)
 
-	s := storage.NewFS("_testing")
+	s := storage.NewFS("_testing", 0766)
 
 	uploads := []*storage.Upload{
-		&storage.Upload{
+		{
 			Path:        "https://mybucket.s3.amazonaws.com/foo/thing1",
 			Body:        []byte(`HELLOWORLD`),
 			ContentType: "text/plain",
-			ACL:         s3.BucketCannedACLPrivate,
 		},
-		&storage.Upload{
+		{
 			Path:        "https://mybucket.s3.amazonaws.com/foo/thing2",
 			Body:        []byte(`HELLOWORLD2`),
 			ContentType: "text/plain",
-			ACL:         s3.BucketCannedACLPrivate,
 		},
 	}
 

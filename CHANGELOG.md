@@ -1,3 +1,234 @@
+v1.42.7 (2023-12-12)
+-------------------------
+ * Update deps
+
+v1.42.6 (2023-11-24)
+-------------------------
+ * Update to latest phonenumbers
+
+v1.42.5 (2023-11-20)
+-------------------------
+ * Update deps
+
+v1.42.4 (2023-11-13)
+-------------------------
+ * Tweak stringsx.Skeleton
+
+v1.42.3 (2023-11-08)
+-------------------------
+ * Update phonenumbers
+
+v1.42.2 (2023-10-30)
+-------------------------
+ * Add httpx.ParseNetworks util function
+
+v1.42.1 (2023-10-28)
+-------------------------
+ * Use error constants for some httpx error cases
+
+v1.42.0 (2023-10-12)
+-------------------------
+ * Update to go 1.21 and update deps
+
+v1.41.3 (2023-09-19)
+-------------------------
+ * Add dbutil.ScanAllJSON
+
+v1.41.2 (2023-09-11)
+-------------------------
+ * Allow creating query errors without an error to wrap
+
+v1.41.1 (2023-09-04)
+-------------------------
+ * Use i18n.Locale for date formatting
+
+v1.41.0 (2023-09-04)
+-------------------------
+ * Move some locales code from goflow/envs
+
+v1.40.0 (2023-08-31)
+-------------------------
+ * Rework syncx.Batcher so that it flushes a batch without waiting if it has enough items
+
+v1.39.1 (2023-08-28)
+-------------------------
+ * Rename dbutil.Queryer to BulkQueryer for clarity
+
+v1.39.0 (2023-08-28)
+-------------------------
+ * Use any instead of interface{}
+ * Add dbutil.ScanAllSlice and ScanAllMap
+ * Test on go 1.21
+
+v1.38.2 (2023-08-09)
+-------------------------
+ * Revert validator dep upgrade
+
+v1.38.1 (2023-08-09)
+-------------------------
+ * Update deps including phonenumbers
+
+v1.38.0 (2023-08-07)
+-------------------------
+ * Add confusables implementation to stringsx
+
+v1.37.0 (2023-07-20)
+-------------------------
+ * Storage paths shouldn't need to start with slash
+
+v1.36.0 (2023-06-30)
+-------------------------
+ * Add syncx.Batcher
+ * Use services for github CI
+
+v1.35.0 (2023-02-18)
+-------------------------
+ * bump golang.org/x/net from 0.5.0 to 0.7.0
+ * Update to latest phonenumbers
+ * Remove null value support functions now that nyaruka/null has been updated
+
+v1.34.1 (2023-01-31)
+-------------------------
+ * Update dependencies including phonenumbers
+
+v1.34.0 (2023-01-26)
+-------------------------
+ * Add util functions for working with nullable string types
+
+v1.33.1 (2022-11-28)
+-------------------------
+ * Update deps
+
+v1.33.0 (2022-11-18)
+-------------------------
+ * Add util function dbutil.ToValidUTF8
+
+v1.32.2
+----------
+ * Fix passing ACL to S3 puts
+
+v1.32.1
+----------
+ * Update deps including phonenumbers
+
+v1.32.0
+----------
+ * Storage types should have object permissions/acl set via constructor
+
+v1.31.0
+----------
+ * Update httpx.DetectContentType to also return extension
+ * Allow mock requestors to ignore localhost requests
+
+v1.30.2
+----------
+ * MockRequestor should log requests
+
+v1.30.1
+----------
+ * Time for an HTTP trace should include reading the entire body
+
+v1.30.0
+----------
+ * Use go 1.19
+ * Fix linter warnings
+ * Add httpx.BasicAuth util
+
+v1.29.0
+----------
+ * Add SantizedRequest to httpx.Trace to match SanitizedResponse
+
+v1.28.2
+----------
+ * Strip more headers from reconstructed requests
+
+v1.28.1
+----------
+ * Fix cloning of request bodies passed to httpx.NewRecorder
+
+v1.28.0
+----------
+ * Give httpx.Recorder the option to try to reconstruct the original request
+
+v1.27.0
+----------
+ * Simplify httpx.Recorder so it always dumps request first
+
+v1.26.0
+----------
+ * Use pointers to httpx.MockResponse
+ * Add HTTP Log support to httpx
+
+v1.25.0
+----------
+ * Tweak httpx.NewMockResponse to take a byte slice
+
+v1.24.1
+----------
+ * Tweak syncx naming and comments
+
+v1.24.0
+----------
+ * Allow use of AWS credential chain for S3 storage
+
+v1.23.0
+----------
+ * Add syncx.HashedMutexMap
+
+v1.22.5
+----------
+ * Add URN type for Teams channel
+
+v1.22.4
+----------
+ * Add dates.Since to match time.Since
+
+v1.22.3
+----------
+ * Add mock analytics backend for testing
+
+v1.22.2
+----------
+ * Update dependencies
+
+v1.22.1
+----------
+ * Fix dates.Date.Combine
+
+v1.22.0
+----------
+ * Add Slack Scheme
+
+v1.21.0
+----------
+ * Add analytics package which provides abstraction layer for librato
+
+v1.20.0
+----------
+ * Add support for db serialization to dates.Date
+
+v1.19.1
+----------
+ * Update to latest phonenumbers
+
+v1.19.0
+----------
+ * Update to go 1.18 and make dbutil.Bulk functions generic
+ * Tidy up scheme list to make it easier to see what is there
+
+v1.18.0
+----------
+ * CI with go 1.17 and 1.18
+ * Add httpx.DetectContentType which wraps functionality from github.com/gabriel-vasile/mimetype
+
+v1.17.1
+----------
+ * Fix race condition in S3Storage.BatchPut
+
+v1.17.0
+----------
+ * Remove rcache module (replace with redisx.IntervalHash) and thus broken redigo dependency
+
 v1.16.2
 ----------
  * Return QueryError if error during row iteration

@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 	"github.com/nyaruka/gocommon/dates"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -67,6 +68,10 @@ func TestDate(t *testing.T) {
 	assert.True(t, d3.Compare(d1) < 0)
 	assert.True(t, d1.Compare(d4) == 0)
 	assert.True(t, d4.Compare(d1) == 0)
+
+	kgl, _ := time.LoadLocation("Africa/Kigali")
+	assert.Equal(t, time.Date(2020, 1, 2, 3, 4, 5, 6, time.UTC), dates.NewDate(2020, 1, 2).Combine(dates.NewTimeOfDay(3, 4, 5, 6), time.UTC))
+	assert.Equal(t, time.Date(2020, 1, 2, 3, 4, 5, 6, kgl), dates.NewDate(2020, 1, 2).Combine(dates.NewTimeOfDay(3, 4, 5, 6), kgl))
 }
 
 func TestDateCalendarMethods(t *testing.T) {
@@ -91,4 +96,37 @@ func TestDateCalendarMethods(t *testing.T) {
 		assert.Equal(t, tc.weekNum, tc.date.WeekNum(), "incorrect week num for %s", tc.date)
 		assert.Equal(t, tc.yearDay, tc.date.YearDay(), "incorrect year day for %s", tc.date)
 	}
+}
+
+func TestDateDBSerialization(t *testing.T) {
+	db := getTestDB()
+
+	defer func() {
+		db.MustExec(`DROP TABLE foo`)
+	}()
+
+	type foo struct {
+		ID   int        `db:"id"`
+		Name string     `db:"name"`
+		Day  dates.Date `db:"day"`
+	}
+
+	db.MustExec(`CREATE TABLE foo (id serial NOT NULL PRIMARY KEY, name VARCHAR(10), day DATE)`)
+	db.MustExec(`INSERT INTO foo (name, day) VALUES($1, $2)`, "Ann", dates.NewDate(2021, 3, 17))
+	_, err := db.NamedExec(`INSERT INTO foo (name, day) VALUES(:name, :day)`, &foo{Name: "Bob", Day: dates.NewDate(2022, 5, 9)})
+	assert.NoError(t, err)
+
+	f := &foo{}
+	err = db.Get(f, `SELECT id, name, day FROM foo WHERE id = 1`)
+	assert.NoError(t, err)
+	assert.Equal(t, dates.NewDate(2021, 3, 17), f.Day)
+
+	err = db.Get(f, `SELECT id, name, day FROM foo WHERE id = 2`)
+	assert.NoError(t, err)
+	assert.Equal(t, dates.NewDate(2022, 5, 9), f.Day)
+}
+
+// returns an open test database pool
+func getTestDB() *sqlx.DB {
+	return sqlx.MustOpen("postgres", "postgres://gocommon_test:temba@localhost/gocommon_test?sslmode=disable&Timezone=UTC")
 }

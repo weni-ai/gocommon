@@ -4,26 +4,39 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/nyaruka/gocommon/jsonx"
-
 	"github.com/pkg/errors"
 )
 
 // MockRequestor is a requestor which can be mocked with responses for given URLs
 type MockRequestor struct {
-	mocks map[string][]MockResponse
+	mocks       map[string][]*MockResponse
+	requests    []*http.Request
+	ignoreLocal bool
 }
 
 // NewMockRequestor creates a new mock requestor with the given mocks
-func NewMockRequestor(mocks map[string][]MockResponse) *MockRequestor {
+func NewMockRequestor(mocks map[string][]*MockResponse) *MockRequestor {
 	return &MockRequestor{mocks: mocks}
+}
+
+// SetIgnoreLocal sets whether the requestor should ignore requests on localhost and delegate these
+// the the default requestor.
+func (r *MockRequestor) SetIgnoreLocal(ignore bool) {
+	r.ignoreLocal = ignore
 }
 
 // Do returns the mocked reponse for the given request
 func (r *MockRequestor) Do(client *http.Client, request *http.Request) (*http.Response, error) {
+	if r.ignoreLocal && isLocalRequest(request) {
+		return DefaultRequestor.Do(client, request)
+	}
+
+	r.requests = append(r.requests, request)
+
 	url := request.URL.String()
 	mockedResponses := r.mocks[url]
 	if len(mockedResponses) == 0 {
@@ -41,6 +54,11 @@ func (r *MockRequestor) Do(client *http.Client, request *http.Request) (*http.Re
 	return mocked.Make(request), nil
 }
 
+// Requests returns the received requests
+func (r *MockRequestor) Requests() []*http.Request {
+	return r.requests
+}
+
 // HasUnused returns true if there are unused mocks leftover
 func (r *MockRequestor) HasUnused() bool {
 	for _, mocks := range r.mocks {
@@ -53,7 +71,7 @@ func (r *MockRequestor) HasUnused() bool {
 
 // Clone returns a clone of this requestor
 func (r *MockRequestor) Clone() *MockRequestor {
-	cloned := make(map[string][]MockResponse)
+	cloned := make(map[string][]*MockResponse)
 	for url, ms := range r.mocks {
 		cloned[url] = ms
 	}
@@ -79,7 +97,7 @@ type MockResponse struct {
 }
 
 // Make mocks making the given request and returning this as the response
-func (m MockResponse) Make(request *http.Request) *http.Response {
+func (m *MockResponse) Make(request *http.Request) *http.Response {
 	header := make(http.Header, len(m.Headers))
 	for k, v := range m.Headers {
 		header.Set(k, v)
@@ -98,17 +116,22 @@ func (m MockResponse) Make(request *http.Request) *http.Response {
 		ProtoMajor:    1,
 		ProtoMinor:    0,
 		Header:        header,
-		Body:          ioutil.NopCloser(bytes.NewReader(body)),
+		Body:          io.NopCloser(bytes.NewReader(body)),
 		ContentLength: int64(len(body)),
 	}
 }
 
 // MockConnectionError mocks a connection error
-var MockConnectionError = MockResponse{Status: 0, Headers: nil, Body: []byte{}, BodyIsString: true, BodyRepeat: 0}
+var MockConnectionError = &MockResponse{Status: 0, Headers: nil, Body: []byte{}, BodyIsString: true, BodyRepeat: 0}
 
-// NewMockResponse creates a new mock response from a string
-func NewMockResponse(status int, headers map[string]string, body string) MockResponse {
-	return MockResponse{Status: status, Headers: headers, Body: []byte(body), BodyIsString: true, BodyRepeat: 0}
+// NewMockResponse creates a new mock response
+func NewMockResponse(status int, headers map[string]string, body []byte) *MockResponse {
+	return &MockResponse{Status: status, Headers: headers, Body: body, BodyIsString: true, BodyRepeat: 0}
+}
+
+func isLocalRequest(r *http.Request) bool {
+	hostname := r.URL.Hostname()
+	return hostname == "localhost" || hostname == "127.0.0.1"
 }
 
 //------------------------------------------------------------------------------------------

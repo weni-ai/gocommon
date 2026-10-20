@@ -119,9 +119,10 @@ var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+$`)
 var viberRegex = regexp.MustCompile(`^[a-zA-Z0-9_=/+]{1,24}$`)
 var lineRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{1,36}$`)
 var allDigitsRegex = regexp.MustCompile(`^[0-9]+$`)
+var whatsappBSUIDRegex = regexp.MustCompile(`^[A-Z]{2}\.(ENT\.)?[a-zA-Z0-9]+$`)
 var freshchatRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}/[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}$`)
 var webchatRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+$`)
-var teamsRegex = regexp.MustCompile(`^a:\w[a-zA-Z0-9\w-]+:(serviceURL):(http[s]?:\/\/(www\.)?(.*)?\/?(.)*(/[a-zA-Z]+)?)`)
+var teamsRegex = regexp.MustCompile(`^a:[a-zA-Z0-9_-]+:serviceURL:https?://.+$`)
 
 // URN represents a Universal Resource Name, we use this for contact identifiers like phone numbers etc..
 type URN string
@@ -317,7 +318,7 @@ func (u URN) Validate() error {
 		}
 
 	case WhatsAppScheme:
-		if !allDigitsRegex.MatchString(path) {
+		if !allDigitsRegex.MatchString(path) && !whatsappBSUIDRegex.MatchString(path) {
 			return fmt.Errorf("invalid whatsapp id: %s", path)
 		}
 

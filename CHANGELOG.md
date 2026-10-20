@@ -1,3 +1,7 @@
+v1.17.0
+----------
+ * Enhance WhatsApp URN validation to support BSUIDs and update test cases accordingly
+
 v1.16.2
 ----------
  * Return QueryError if error during row iteration

@@ -38,12 +38,21 @@ type S3Options struct {
 
 // NewS3Client creates a new S3 client
 func NewS3Client(opts *S3Options) (S3Client, error) {
+	s3Session, err := newS3Session(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return s3.New(s3Session, s3ClientConfig(opts, opts.Endpoint, opts.Region)), nil
+}
+
+// newS3Session creates the session credentials are resolved from. The endpoint is deliberately left
+// out because with IRSA this session also calls STS to exchange the web identity token, and STS
+// doesn't live at the S3 endpoint.
+func newS3Session(opts *S3Options) (*session.Session, error) {
 	awsConfig := &aws.Config{
-		Endpoint:         aws.String(opts.Endpoint),
-		Region:           aws.String(opts.Region),
-		DisableSSL:       aws.Bool(opts.DisableSSL),
-		S3ForcePathStyle: aws.Bool(opts.ForcePathStyle),
-		MaxRetries:       aws.Int(opts.MaxRetries),
+		Region:     aws.String(opts.Region),
+		MaxRetries: aws.Int(opts.MaxRetries),
 	}
 
 	// Only use static credentials if both are provided
@@ -52,12 +61,19 @@ func NewS3Client(opts *S3Options) (S3Client, error) {
 		awsConfig.Credentials = credentials.NewStaticCredentials(opts.AWSAccessKeyID, opts.AWSSecretAccessKey, "")
 	}
 
-	s3Session, err := session.NewSession(awsConfig)
-	if err != nil {
-		return nil, err
-	}
+	return session.NewSession(awsConfig)
+}
 
-	return s3.New(s3Session), nil
+func s3ClientConfig(opts *S3Options, endpoint, region string) *aws.Config {
+	config := &aws.Config{
+		Region:           aws.String(region),
+		DisableSSL:       aws.Bool(opts.DisableSSL),
+		S3ForcePathStyle: aws.Bool(opts.ForcePathStyle),
+	}
+	if endpoint != "" {
+		config.Endpoint = aws.String(endpoint)
+	}
+	return config
 }
 
 type s3Storage struct {
@@ -136,7 +152,6 @@ func (s *s3Storage) batchWorker(ctx context.Context, uploads chan *Upload, error
 					Body:        bytes.NewReader(u.Body),
 					Key:         aws.String(u.Path),
 					ContentType: aws.String(u.ContentType),
-					ACL:         aws.String(u.ACL),
 				})
 
 				if err == nil {

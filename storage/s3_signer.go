@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
@@ -19,6 +20,18 @@ const MaxPresignExpiration = 7 * 24 * time.Hour
 const awsHostSuffix = ".amazonaws.com"
 
 var awsRegionRegex = regexp.MustCompile(`^[a-z]{2}(-[a-z]+)+-\d+$`)
+
+var knownAWSRegions = loadKnownAWSRegions()
+
+func loadKnownAWSRegions() map[string]bool {
+	regions := make(map[string]bool)
+	for _, partition := range endpoints.DefaultPartitions() {
+		for id := range partition.Regions() {
+			regions[id] = true
+		}
+	}
+	return regions
+}
 
 // ParseS3URL extracts bucket, key and (optional) region from an S3 object URL. It supports virtual-hosted
 // URLs (bucket.s3.amazonaws.com, bucket.s3.<region>.amazonaws.com, bucket.s3-<region>.amazonaws.com) and
@@ -143,7 +156,7 @@ func NewS3URLSigner(opts *S3Options, allowedBuckets []string) (*S3URLSigner, err
 }
 
 // Sign returns a presigned GET URL; signed=false (and the input URL) when the URL
-// is not an S3 URL of an allowed bucket
+// is not an S3 URL of an allowed bucket in a known region
 func (s *S3URLSigner) Sign(rawURL string, expiration time.Duration) (string, bool, error) {
 	if expiration <= 0 || expiration > MaxPresignExpiration {
 		return "", false, errors.Errorf("presign expiration must be greater than 0 and at most %s, got %s", MaxPresignExpiration, expiration)
@@ -167,10 +180,15 @@ func (s *S3URLSigner) Sign(rawURL string, expiration time.Duration) (string, boo
 
 // parse resolves the bucket and key of the URL, and which client should sign it. AWS hosted URLs are signed
 // against AWS for their region, and path-style URLs on the configured endpoint host against that endpoint.
+// Regions come from the URL and each gets a cached client, so only the configured region and regions known
+// to the SDK are accepted.
 func (s *S3URLSigner) parse(rawURL string) (bucket, key string, clientKey s3SignerClientKey, ok bool) {
 	if bucket, key, region, ok := ParseS3URL(rawURL); ok {
 		if region == "" {
 			region = s.opts.Region
+		}
+		if region != s.opts.Region && !knownAWSRegions[region] {
+			return "", "", s3SignerClientKey{}, false
 		}
 		return bucket, key, s3SignerClientKey{region: region}, true
 	}

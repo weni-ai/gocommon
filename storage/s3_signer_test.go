@@ -92,6 +92,8 @@ func TestS3URLSignerSign(t *testing.T) {
 		{"https://attachments.bucket.s3.sa-east-1.amazonaws.com/foo.jpg", true, "s3.sa-east-1.amazonaws.com", "/attachments.bucket/foo.jpg", "sa-east-1"},
 
 		{"https://other-bucket.s3.sa-east-1.amazonaws.com/media/foo.jpg", false, "", "", ""},
+		{"https://media-bucket.s3.aa-fake-1.amazonaws.com/media/foo.jpg", false, "", "", ""},
+		{"https://s3-aa-fake-1.amazonaws.com/media-bucket/media/foo.jpg", false, "", "", ""},
 		{"https://example.com/media/foo.jpg", false, "", "", ""},
 		{"https://media-bucket.example.com/media/foo.jpg", false, "", "", ""},
 	}
@@ -122,6 +124,26 @@ func TestS3URLSignerSign(t *testing.T) {
 		assert.Equal(t, tc.signedRegion, credential[2], "credential region mismatch for %s", tc.url)
 		assert.Equal(t, "s3", credential[3])
 	}
+}
+
+func TestS3URLSignerConfiguredRegion(t *testing.T) {
+	signer, err := storage.NewS3URLSigner(&storage.S3Options{
+		AWSAccessKeyID:     "AKIDTEST",
+		AWSSecretAccessKey: "secret",
+		Region:             "xx-newregion-1",
+	}, []string{"media-bucket"})
+	require.NoError(t, err)
+
+	// the configured region is trusted even if the SDK doesn't know it yet
+	signedURL, signed, err := signer.Sign("https://media-bucket.s3.xx-newregion-1.amazonaws.com/foo.jpg", time.Hour)
+	assert.NoError(t, err)
+	assert.True(t, signed)
+	assert.Contains(t, signedURL, "%2Fxx-newregion-1%2Fs3%2F")
+
+	signedURL, signed, err = signer.Sign("https://media-bucket.s3.xx-otherregion-1.amazonaws.com/foo.jpg", time.Hour)
+	assert.NoError(t, err)
+	assert.False(t, signed)
+	assert.Equal(t, "https://media-bucket.s3.xx-otherregion-1.amazonaws.com/foo.jpg", signedURL)
 }
 
 func TestS3URLSignerConcurrentSign(t *testing.T) {

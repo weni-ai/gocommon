@@ -34,6 +34,11 @@ type S3Options struct {
 	DisableSSL         bool
 	ForcePathStyle     bool
 	MaxRetries         int
+
+	// CredentialsExpiryWindow is how long before web identity (IRSA) credentials expire the URL signer
+	// refreshes them, and so the minimum time a URL it signs stays valid. Defaults to
+	// DefaultCredentialsExpiryWindow. It must be shorter than the role session duration.
+	CredentialsExpiryWindow time.Duration
 }
 
 // NewS3Client creates a new S3 client

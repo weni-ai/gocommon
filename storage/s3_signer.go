@@ -2,20 +2,27 @@ package storage
 
 import (
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/pkg/errors"
 )
 
 // MaxPresignExpiration is the longest expiration SigV4 allows for a presigned URL
 const MaxPresignExpiration = 7 * 24 * time.Hour
+
+// DefaultCredentialsExpiryWindow is the default for S3Options.CredentialsExpiryWindow
+const DefaultCredentialsExpiryWindow = 15 * time.Minute
 
 const awsHostSuffix = ".amazonaws.com"
 
@@ -103,7 +110,8 @@ func parseHTTPURL(rawURL string) (*url.URL, bool) {
 // same credentials, resolved like NewS3Client does (static keys if set, otherwise the default chain).
 //
 // When those credentials are temporary (e.g. IRSA), a presigned URL stops working when the session token
-// used to sign it expires, regardless of the requested expiration.
+// used to sign it expires, regardless of the requested expiration. Web identity credentials are refreshed
+// CredentialsExpiryWindow before they expire, so every signed URL stays valid for at least that long.
 type S3URLSigner struct {
 	session        *session.Session
 	opts           *S3Options
@@ -124,6 +132,10 @@ func NewS3URLSigner(opts *S3Options, allowedBuckets []string) (*S3URLSigner, err
 	sess, err := newS3Session(opts)
 	if err != nil {
 		return nil, err
+	}
+
+	if provider := webIdentityProvider(sess, opts); provider != nil {
+		sess = sess.Copy(&aws.Config{Credentials: credentials.NewCredentials(provider)})
 	}
 
 	endpointHost := ""
@@ -153,6 +165,44 @@ func NewS3URLSigner(opts *S3Options, allowedBuckets []string) (*S3URLSigner, err
 		allowedBuckets: allowed,
 		clients:        make(map[s3SignerClientKey]*s3.S3),
 	}, nil
+}
+
+// webIdentityProvider returns a web identity provider that refreshes CredentialsExpiryWindow before expiry,
+// or nil when the default chain wouldn't use web identity. The SDK's own provider has no expiry window, so
+// it would sign with credentials that are about to expire.
+func webIdentityProvider(sess *session.Session, opts *S3Options) *stscreds.WebIdentityRoleProvider {
+	if opts.AWSAccessKeyID != "" && opts.AWSSecretAccessKey != "" {
+		return nil
+	}
+	if hasEnvStaticCredentials() {
+		return nil
+	}
+
+	tokenFile := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE")
+	roleARN := os.Getenv("AWS_ROLE_ARN")
+	if tokenFile == "" || roleARN == "" {
+		return nil
+	}
+
+	provider := stscreds.NewWebIdentityRoleProviderWithToken(sts.New(sess), roleARN, os.Getenv("AWS_ROLE_SESSION_NAME"), stscreds.FetchTokenPath(tokenFile))
+	provider.ExpiryWindow = opts.CredentialsExpiryWindow
+	if provider.ExpiryWindow <= 0 {
+		provider.ExpiryWindow = DefaultCredentialsExpiryWindow
+	}
+	return provider
+}
+
+// hasEnvStaticCredentials mirrors the SDK default chain, where env keys take precedence over web identity
+func hasEnvStaticCredentials() bool {
+	firstEnv := func(names ...string) string {
+		for _, n := range names {
+			if v := os.Getenv(n); v != "" {
+				return v
+			}
+		}
+		return ""
+	}
+	return firstEnv("AWS_ACCESS_KEY_ID", "AWS_ACCESS_KEY") != "" && firstEnv("AWS_SECRET_ACCESS_KEY", "AWS_SECRET_KEY") != ""
 }
 
 // Sign returns a presigned GET URL; signed=false (and the input URL) when the URL

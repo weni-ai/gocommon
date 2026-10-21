@@ -5,6 +5,7 @@ v1.18.0
  * Keep the S3 endpoint off the AWS session so IRSA credential exchange goes to STS
  * Add S3URLSigner and ParseS3URL to presign GET URLs for objects in private buckets
  * Fix BatchPut returning before all upload workers have finished
+ * S3URLSigner refreshes web identity (IRSA) credentials early (S3Options.CredentialsExpiryWindow, default 15m) so signed URLs stay valid for at least that long
 
 v1.17.0
 ----------

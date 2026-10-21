@@ -1,3 +1,10 @@
+v1.18.0
+----------
+ * Use static S3 credentials only when both keys are set, otherwise the default credential chain (IRSA, env, instance profile)
+ * Stop sending public-read and batch upload ACLs to S3, deprecate Upload.ACL
+ * Keep the S3 endpoint off the AWS session so IRSA credential exchange goes to STS
+ * Add S3URLSigner and ParseS3URL to presign GET URLs for objects in private buckets
+
 v1.17.0
 ----------
  * Enhance WhatsApp URN validation to support BSUIDs and update test cases accordingly

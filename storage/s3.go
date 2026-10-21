@@ -134,7 +134,6 @@ func (s *s3Storage) Put(ctx context.Context, path string, contentType string, co
 }
 
 func (s *s3Storage) batchWorker(ctx context.Context, uploads chan *Upload, errors chan error, stop chan bool, wg *sync.WaitGroup) {
-	wg.Add(1)
 	defer wg.Done()
 
 	for {
@@ -183,6 +182,7 @@ func (s *s3Storage) BatchPut(ctx context.Context, us []*Upload) error {
 
 	// start our workers
 	for w := 0; w < s.workersPerBatch; w++ {
+		wg.Add(1)
 		go s.batchWorker(ctx, uploads, errors, stop, wg)
 	}
 

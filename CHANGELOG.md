@@ -4,6 +4,7 @@ v1.18.0
  * Stop sending public-read and batch upload ACLs to S3, deprecate Upload.ACL
  * Keep the S3 endpoint off the AWS session so IRSA credential exchange goes to STS
  * Add S3URLSigner and ParseS3URL to presign GET URLs for objects in private buckets
+ * Fix BatchPut returning before all upload workers have finished
 
 v1.17.0
 ----------

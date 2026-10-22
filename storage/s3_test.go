@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io/ioutil"
+	"sync"
 	"testing"
 
 	"github.com/nyaruka/gocommon/storage"
@@ -20,6 +21,9 @@ type testS3Client struct {
 	headBucketReturnValue *s3.HeadBucketOutput
 	getObjectReturnValue  *s3.GetObjectOutput
 	putObjectReturnValue  *s3.PutObjectOutput
+
+	putObjectMutex  sync.Mutex
+	putObjectInputs []*s3.PutObjectInput
 }
 
 func (c *testS3Client) HeadBucketWithContext(ctx context.Context, input *s3.HeadBucketInput, opts ...request.Option) (*s3.HeadBucketOutput, error) {
@@ -35,10 +39,41 @@ func (c *testS3Client) GetObjectWithContext(ctx context.Context, input *s3.GetOb
 	return c.getObjectReturnValue, nil
 }
 func (c *testS3Client) PutObjectWithContext(ctx context.Context, input *s3.PutObjectInput, opts ...request.Option) (*s3.PutObjectOutput, error) {
+	c.putObjectMutex.Lock()
+	c.putObjectInputs = append(c.putObjectInputs, input)
+	c.putObjectMutex.Unlock()
+
 	if c.returnError != nil {
 		return nil, c.returnError
 	}
 	return c.putObjectReturnValue, nil
+}
+
+func TestNewS3Client(t *testing.T) {
+	client, err := storage.NewS3Client(&storage.S3Options{
+		AWSAccessKeyID:     "AKIDTEST",
+		AWSSecretAccessKey: "secret",
+		Region:             "sa-east-1",
+		MaxRetries:         2,
+	})
+	assert.NoError(t, err)
+	awsClient := client.(*s3.S3)
+	assert.Equal(t, "https://s3.sa-east-1.amazonaws.com", awsClient.Endpoint)
+	assert.Equal(t, "sa-east-1", aws.StringValue(awsClient.Config.Region))
+	assert.Equal(t, 2, aws.IntValue(awsClient.Config.MaxRetries))
+	assert.False(t, aws.BoolValue(awsClient.Config.S3ForcePathStyle))
+
+	client, err = storage.NewS3Client(&storage.S3Options{
+		Endpoint:       "http://localhost:9000",
+		Region:         "us-east-1",
+		DisableSSL:     true,
+		ForcePathStyle: true,
+	})
+	assert.NoError(t, err)
+	awsClient = client.(*s3.S3)
+	assert.Equal(t, "http://localhost:9000", awsClient.Endpoint)
+	assert.True(t, aws.BoolValue(awsClient.Config.DisableSSL))
+	assert.True(t, aws.BoolValue(awsClient.Config.S3ForcePathStyle))
 }
 
 func TestS3Test(t *testing.T) {
@@ -114,6 +149,12 @@ func TestS3BatchPut(t *testing.T) {
 
 	assert.NotEmpty(t, uploads[0].URL)
 	assert.NotEmpty(t, uploads[1].URL)
+
+	// ACLs are no longer sent
+	assert.Len(t, client.putObjectInputs, 2)
+	for _, input := range client.putObjectInputs {
+		assert.Nil(t, input.ACL)
+	}
 
 	// try again, with a single thread and throwing an error
 	s = storage.NewS3(client, "mybucket", "us-east-1", 1)

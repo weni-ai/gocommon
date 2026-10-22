@@ -25,7 +25,11 @@ type Upload struct {
 	Path        string
 	Body        []byte
 	ContentType string
-	ACL         string
-	URL         string
-	Error       error
+
+	// Deprecated: ACL is ignored, objects are no longer uploaded with canned ACLs because buckets
+	// with ACLs disabled (BucketOwnerEnforced) reject them
+	ACL string
+
+	URL   string
+	Error error
 }
